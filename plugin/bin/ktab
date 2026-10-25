@@ -18,6 +18,7 @@ declare -A PALETTE=(
   [cyan]="#00acc1"
   [gray]="#7f8c8d"
   [grey]="#7f8c8d"
+  [white]="#ffffff"
 )
 
 declare -A TYPE_COLOR=(
@@ -25,7 +26,18 @@ declare -A TYPE_COLOR=(
   [feature]=green
   [refactor]=blue
   [research]=purple
+  [devops]=white
   [other]=gray
+)
+
+# What each type means; the classifier passes these to the model.
+declare -A TYPE_HINT=(
+  [bug]="fix broken behaviour, an error, a crash or a regression"
+  [feature]="add new functionality"
+  [refactor]="restructure or clean up code without changing behaviour"
+  [research]="investigate, explain or find out how something works or why it happens"
+  [devops]="set up environments and tools, servers, CI/CD, deployment, package or software updates"
+  [other]="anything else"
 )
 
 die() {
@@ -124,12 +136,17 @@ case "$cmd" in
   restore) dbus setTabColor "${1:-}" >/dev/null ;;
   type-color) resolve "${TYPE_COLOR[${1:-}]:-gray}" ;;
   types) printf '%s\n' "${!TYPE_COLOR[@]}" | sort ;;
+  type-hints)
+    for t in $(printf '%s\n' "${!TYPE_COLOR[@]}" | sort); do
+      echo "- $t: ${TYPE_HINT[$t]:-}"
+    done
+    ;;
   state-get) state_get "$@" ;;
   state-set) state_set "$@" ;;
   state-dir) echo "$STATE_DIR" ;;
   log) log "$*" ;;
   *)
-    echo "usage: ktab resolve|in-konsole|set|get|reset|restore|type-color|state-get|state-set|state-dir|log" >&2
+    echo "usage: ktab resolve|in-konsole|set|get|reset|restore|type-color|types|type-hints|state-get|state-set|state-dir|log" >&2
     exit 2
     ;;
 esac

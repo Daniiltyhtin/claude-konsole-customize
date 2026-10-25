@@ -24,7 +24,7 @@ test_reply_wrapped_in_text_or_markdown_is_parsed() {
 test_invalid_replies_fail_without_painting() {
   local reply
   for reply in '{"type":"weird","slug":"ok-slug"}' '{"type":"bug|feature","slug":"ok-slug"}' '{"type":"bug","slug":"Bad Slug!"}' \
-    '{"type":"bug","slug":"one"}' '{"type":"bug","slug":"a-b-c-d"}' 'no json at all' \
+    '{"type":"bug","slug":"one"}' 'no json at all' \
     '{"type":"bug","slug":"aaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbbbbbb"}'; do
     : >"$SHIM_LOG"
     export SHIM_CLAUDE_OUTPUT="$reply"
@@ -32,6 +32,13 @@ test_invalid_replies_fail_without_painting() {
     assert_eq "$(st stage)" "failed" "reply: $reply" || return 1
     assert_not_contains "$(calls)" "setTabColor" || return 1
   done
+}
+
+test_long_slug_is_cut_to_three_words() {
+  export SHIM_CLAUDE_OUTPUT='{"type":"devops","slug":"docker-compose-local-setup"}'
+  run_classify "настрой docker compose" &&
+    assert_eq "$(st stage)" "done" &&
+    assert_eq "$(st slug)" "docker-compose-local"
 }
 
 test_claude_failure_marks_failed() {
@@ -69,6 +76,14 @@ test_live_owner_allows_paint() {
   export SHIM_CLAUDE_OUTPUT='{"type":"refactor","slug":"split-parser-module"}'
   "$KTAB" state-set sess-1 owner_pid="$$"
   run_classify "x" && assert_contains "$(calls)" "setTabColor #2980b9"
+}
+
+test_devops_reply_paints_white_and_prompt_explains_types() {
+  export SHIM_CLAUDE_OUTPUT='{"type":"devops","slug":"nginx-cert-renewal"}'
+  run_classify "обнови сертификаты на сервере" &&
+    assert_eq "$(st type)" "devops" &&
+    assert_contains "$(calls)" "setTabColor #ffffff" &&
+    assert_contains "$(cat "$SHIM_DIR/last_arg")" "- devops:"
 }
 
 test_nested_call_flags() {

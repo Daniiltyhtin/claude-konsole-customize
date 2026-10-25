@@ -20,6 +20,9 @@ types=$("$KTAB" types | paste -sd '|')
 instruction="Classify the developer task below. Reply with exactly one JSON object and nothing else:
 {\"type\": \"<$types>\", \"slug\": \"<2-3 lowercase english words in kebab-case naming the task>\"}
 
+Types:
+$("$KTAB" type-hints)
+
 Task:"
 
 # --setting-sources "" keeps plugins (and this hook) out of the nested session (KTD6).
@@ -34,6 +37,8 @@ type=$(jq -r '.type // empty' <<<"$json" 2>/dev/null)
 slug=$(jq -r '.slug // empty' <<<"$json" 2>/dev/null)
 
 [[ "$type" =~ ^[a-z]+$ && "|$types|" == *"|$type|"* ]] || finish_failed "bad type [$type]"
+# A longer kebab-case slug is cut to its first 3 words instead of being rejected.
+[[ "$slug" =~ ^[a-z0-9]+(-[a-z0-9]+)+$ ]] && slug=$(cut -d- -f1-3 <<<"$slug")
 [[ "$slug" =~ ^[a-z0-9]+(-[a-z0-9]+){1,2}$ && ${#slug} -le 32 ]] || finish_failed "bad slug [$slug]"
 
 if [[ "$(st color_source)" != manual ]]; then

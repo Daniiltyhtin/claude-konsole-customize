@@ -53,12 +53,26 @@ test_type_color_mapping() {
     assert_eq "$("$KTAB" type-color feature)" "$("$KTAB" resolve green)" &&
     assert_eq "$("$KTAB" type-color refactor)" "$("$KTAB" resolve blue)" &&
     assert_eq "$("$KTAB" type-color research)" "$("$KTAB" resolve purple)" &&
+    assert_eq "$("$KTAB" type-color devops)" "$("$KTAB" resolve white)" &&
     assert_eq "$("$KTAB" type-color other)" "$("$KTAB" resolve gray)" &&
     assert_eq "$("$KTAB" type-color weird)" "$("$KTAB" resolve gray)"
 }
 
 test_types_lists_every_type_with_a_colour() {
-  assert_eq "$("$KTAB" types | paste -sd ' ')" "bug feature other refactor research"
+  assert_eq "$("$KTAB" types | paste -sd ' ')" "bug devops feature other refactor research"
+}
+
+test_white_is_in_the_palette() {
+  assert_eq "$("$KTAB" resolve white)" "#ffffff"
+}
+
+test_type_hints_describe_every_type() {
+  local t hints
+  hints=$("$KTAB" type-hints)
+  for t in $("$KTAB" types); do
+    assert_contains "$hints" "- $t:" || return 1
+  done
+  assert_contains "$hints" "servers"
 }
 
 test_state_set_creates_and_merges() {
