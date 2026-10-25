@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Fake pacman for rebuild.sh --check: versions come from SHIM_PACMAN_* env.
+
+case "$1 ${2:-}" in
+  "-Q konsole") echo "konsole $SHIM_PACMAN_INSTALLED" ;;
+  "-Si konsole") printf 'Repository      : distro-extra\nVersion         : %s\n\nRepository      : extra\nVersion         : %s\n' "$SHIM_PACMAN_REPO" "$SHIM_PACMAN_EXTRA" ;;
+  "-Si extra/konsole") printf 'Repository      : extra\nVersion         : %s\n' "$SHIM_PACMAN_EXTRA" ;;
+  *) exit 1 ;;
+esac

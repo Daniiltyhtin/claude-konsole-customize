@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# ktab — Konsole tab colour + per-session state for Claude Code sessions.
+# Single source of truth for the palette, D-Bus calls and the state store.
+
+set -u
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-konsole-customize"
+SESSIONS_DIR="$STATE_DIR/sessions"
+
+declare -A PALETTE=(
+  [red]="#c0392b"
+  [green]="#27ae60"
+  [blue]="#2980b9"
+  [purple]="#8e44ad"
+  [orange]="#d35400"
+  [yellow]="#f1c40f"
+  [pink]="#e84393"
+  [cyan]="#00acc1"
+  [gray]="#7f8c8d"
+  [grey]="#7f8c8d"
+)
+
+declare -A TYPE_COLOR=(
+  [bug]=red
+  [feature]=green
+  [refactor]=blue
+  [research]=purple
+  [other]=gray
+)
+
+die() {
+  echo "ktab: $*" >&2
+  exit 1
+}
+
+log() {
+  mkdir -p "$STATE_DIR" 2>/dev/null || return 0
+  printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$STATE_DIR/log" 2>/dev/null || true
+}
+
+# Black is excluded: Konsole reports "no colour" as #000000.
+resolve() {
+  local c="${1,,}"
+  if [[ -n "${PALETTE[$c]:-}" ]]; then
+    echo "${PALETTE[$c]}"
+  elif [[ "$c" =~ ^#[0-9a-f]{6}$ && "$c" != "#000000" ]]; then
+    echo "$c"
+  else
+    return 1
+  fi
+}
+
+in_konsole() {
+  [[ -n "${KONSOLE_DBUS_SERVICE:-}" && -n "${KONSOLE_DBUS_SESSION:-}" ]] &&
+    command -v qdbus6 >/dev/null 2>&1
+}
+
+dbus() {
+  in_konsole || return 1
+  qdbus6 "$KONSOLE_DBUS_SERVICE" "$KONSOLE_DBUS_SESSION" "$@" 2>/dev/null
+}
+
+valid_session() {
+  [[ "$1" =~ ^[A-Za-z0-9_-]{1,128}$ ]]
+}
+
+state_file() {
+  valid_session "$1" || die "invalid session id"
+  echo "$SESSIONS_DIR/$1.json"
+}
+
+state_get() {
+  local file
+  file=$(state_file "$1") || exit 1
+  [[ -f "$file" ]] || return 0
+  if [[ $# -ge 2 ]]; then
+    jq -r --arg k "$2" '.[$k] // empty' "$file" 2>/dev/null
+  else
+    cat "$file"
+  fi
+}
+
+# state-set <session> key=value... — merge, then atomic rename.
+state_set() {
+  local file tmp kv current args=()
+  file=$(state_file "$1") || exit 1
+  shift
+  mkdir -p "$SESSIONS_DIR" || return 1
+  current="{}"
+  [[ -f "$file" ]] && current=$(cat "$file")
+  for kv in "$@"; do
+    [[ "$kv" == *=* ]] || die "expected key=value, got [$kv]"
+    args+=("${kv%%=*}" "${kv#*=}")
+  done
+  tmp=$(mktemp "$SESSIONS_DIR/.tmp.XXXXXX") || return 1
+  if jq -n --argjson cur "${current:-"{}"}" '
+      $ARGS.positional as $p
+      | reduce range(0; $p | length; 2) as $i ($cur; .[$p[$i]] = $p[$i + 1])
+    ' --args "${args[@]}" >"$tmp" 2>/dev/null; then
+    mv "$tmp" "$file"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  resolve) resolve "${1:-}" ;;
+  in-konsole) in_konsole ;;
+  set)
+    hex=$(resolve "${1:-}") || die "unknown colour: ${1:-}"
+    dbus setTabColor "$hex" >/dev/null
+    ;;
+  get)
+    out=$(dbus tabColor) || exit 1
+    out="${out//$'\n'/}"
+    [[ "$out" == "#000000" ]] && out=""
+    echo "$out"
+    ;;
+  reset) dbus setTabColor "" >/dev/null ;;
+  # restore <hex-or-empty>: put back a snapshot taken with `get`.
+  restore) dbus setTabColor "${1:-}" >/dev/null ;;
+  type-color) resolve "${TYPE_COLOR[${1:-}]:-gray}" ;;
+  types) printf '%s\n' "${!TYPE_COLOR[@]}" | sort ;;
+  state-get) state_get "$@" ;;
+  state-set) state_set "$@" ;;
+  state-dir) echo "$STATE_DIR" ;;
+  log) log "$*" ;;
+  *)
+    echo "usage: ktab resolve|in-konsole|set|get|reset|restore|type-color|state-get|state-set|state-dir|log" >&2
+    exit 2
+    ;;
+esac

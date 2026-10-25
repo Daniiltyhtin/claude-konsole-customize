@@ -1,0 +1,25 @@
+{
+  "name": "konsole-tabs",
+  "version": "0.1.0",
+  "description": "Name and colour the Konsole tab of a Claude Code session: restore on resume, optional auto-pick from the first prompt",
+  "author": {
+    "name": "Daniiltyhtin"
+  },
+  "license": "MIT",
+  "userConfig": {
+    "auto_mode": {
+      "type": "boolean",
+      "title": "Auto name and colour",
+      "description": "Pick a short tab name and a colour by task type from the first prompt (runs a small haiku call in the background)",
+      "default": false
+    },
+    "auto_attempts": {
+      "type": "number",
+      "title": "Auto attempts per session",
+      "description": "How many times auto mode may try to pick a name and colour in one session when a try fails (no network, login error). 1 = no retry",
+      "default": 1,
+      "min": 1,
+      "max": 5
+    }
+  }
+}

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Fake qdbus6: records calls and mimics Konsole's tabColor/setTabColor round-trip.
+
+echo "qdbus6 $*" >>"$SHIM_LOG"
+[[ -n "${SHIM_QDBUS_FAIL:-}" ]] && exit 1
+
+case "${3:-}" in
+  tabColor)
+    # Konsole reports "no colour" as #000000.
+    if [[ -s "$SHIM_DIR/tab_color" ]]; then cat "$SHIM_DIR/tab_color"; else echo "#000000"; fi
+    echo
+    ;;
+  setTabColor)
+    printf '%s' "${4:-}" >"$SHIM_DIR/tab_color"
+    ;;
+esac
+exit 0

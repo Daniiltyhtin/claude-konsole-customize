@@ -1,0 +1,16 @@
+{
+  "name": "claude-konsole-customize",
+  "owner": {
+    "name": "Daniiltyhtin"
+  },
+  "metadata": {
+    "description": "Local marketplace for the konsole-tabs plugin"
+  },
+  "plugins": [
+    {
+      "name": "konsole-tabs",
+      "description": "Name and colour the Konsole tab of a Claude Code session",
+      "source": "./plugin"
+    }
+  ]
+}

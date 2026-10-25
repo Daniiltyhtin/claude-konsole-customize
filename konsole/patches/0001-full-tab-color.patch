@@ -1,0 +1,73 @@
+diff --git a/src/widgets/DetachableTabBar.cpp b/src/widgets/DetachableTabBar.cpp
+index b51f2c9..8cc79c1 100644
+--- a/src/widgets/DetachableTabBar.cpp
++++ b/src/widgets/DetachableTabBar.cpp
+@@ -16,6 +16,9 @@
+ 
+ #include <QColor>
+ #include <QPainter>
++#include <QStyleOptionTab>
++
++#include <cmath>
+ 
+ namespace Konsole
+ {
+@@ -192,6 +195,18 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
+     QPainter painter(this);
+     painter.setPen(Qt::NoPen);
+ 
++    // WCAG relative luminance; black text when it contrasts better than white.
++    const auto contrastingText = [](const QColor &c) {
++        const auto lin = [](qreal v) {
++            return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4);
++        };
++        const qreal l = 0.2126 * lin(c.redF()) + 0.7152 * lin(c.greenF()) + 0.0722 * lin(c.blueF());
++        return l > 0.179 ? QColor(Qt::black) : QColor(Qt::white);
++    };
++    const auto mix = [](const QColor &a, const QColor &b, qreal t) {
++        return QColor::fromRgbF(a.redF() * (1 - t) + b.redF() * t, a.greenF() * (1 - t) + b.greenF() * t, a.blueF() * (1 - t) + b.blueF() * t);
++    };
++
+     for (int tabIndex = 0; tabIndex < count(); tabIndex++) {
+         const QVariant data = tabData(tabIndex);
+         if (!data.isValid() || data.isNull()) {
+@@ -208,7 +223,29 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
+ 
+         const QColor color = colorValid ? tabData.color : palette().highlight().color();
+ 
+-        painter.setBrush(color);
++        // Fill the whole tab and redraw its label on top; inactive tabs are dimmed
++        // towards the window colour so the current tab stays recognisable.
++        QColor progressColor = color;
++        if (colorValid) {
++            const QColor fill = tabIndex == currentIndex() ? color : mix(color, palette().window().color(), 0.45);
++            const QColor text = contrastingText(fill);
++            painter.save();
++            painter.setRenderHint(QPainter::Antialiasing);
++            painter.setBrush(fill);
++            painter.drawRoundedRect(QRectF(tabRect(tabIndex)).adjusted(1.5, 2.5, -1.5, -1.5), 4, 4);
++            painter.restore();
++
++            QStyleOptionTab opt;
++            initStyleOption(&opt, tabIndex);
++            opt.palette.setColor(QPalette::WindowText, text);
++            opt.palette.setColor(QPalette::ButtonText, text);
++            opt.palette.setColor(QPalette::Text, text);
++            opt.palette.setColor(QPalette::HighlightedText, text);
++            style()->drawControl(QStyle::CE_TabBarTabLabel, &opt, &painter, this);
++            progressColor = text;
++        }
++
++        painter.setBrush(progressColor);
+         QRect tRect = tabRect(tabIndex);
+         tRect.setTop(painter.fontMetrics().height() + 6); // Color bar top position consider a height the font and fixed spacing of 6px
+         tRect.setHeight(4);
+@@ -223,8 +260,6 @@ void DetachableTabBar::paintEvent(QPaintEvent *event)
+ 
+             tRect.setWidth(tRect.width() * tabData.progress.value() / 100.0);
+             painter.drawRect(tRect);
+-        } else {
+-            painter.drawRect(tRect);
+         }
+     }
+ }

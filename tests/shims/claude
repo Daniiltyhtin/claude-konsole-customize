@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Fake claude: records argv and the env the hooks rely on, then mimics a reply.
+
+{
+  printf 'claude'
+  (($#)) && printf ' [%s]' "$@"
+  echo
+  echo "env KTAB_COLOR=${KTAB_COLOR-<unset>} KTAB_NAME_SET=${KTAB_NAME_SET-<unset>} KTAB_NESTED=${KTAB_NESTED-<unset>} CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR-<unset>}"
+} >>"$SHIM_LOG"
+echo "$#" >"$SHIM_DIR/argc"
+(($#)) && printf '%s' "${@: -1}" >"$SHIM_DIR/last_arg"
+
+[[ -n "${SHIM_CLAUDE_SLEEP:-}" ]] && sleep "$SHIM_CLAUDE_SLEEP"
+[[ -n "${SHIM_CLAUDE_OUTPUT:-}" ]] && printf '%s\n' "$SHIM_CLAUDE_OUTPUT"
+exit "${SHIM_CLAUDE_RC:-0}"
